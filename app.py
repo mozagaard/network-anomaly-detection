@@ -54,16 +54,12 @@ if st.sidebar.button("🔍 Deteksi Sekarang"):
     binary_proba = xgb_binary.predict_proba(input_df)[0]
 
     st.subheader("Hasil Deteksi")
-    
-    st.write("Debug input:", input_dict['protocol_type'], 
-         input_dict['count'], input_dict['src_bytes'])
-    
+
     if binary_pred == 0:
         st.success(f"✅ Traffic NORMAL (confidence: {binary_proba[0]*100:.1f}%)")
 
-        # confidence chart
         fig, ax = plt.subplots(figsize=(6, 3))
-        sns.barplot(x=['Normal', 'Anomali'], 
+        sns.barplot(x=['Normal', 'Anomali'],
                    y=[binary_proba[0], binary_proba[1]],
                    palette=['green', 'red'], ax=ax)
         ax.set_ylabel('Probability')
@@ -80,7 +76,6 @@ if st.sidebar.button("🔍 Deteksi Sekarang"):
 
         st.warning(f"⚔️ Tipe Serangan: **{attack_name.upper()}**")
 
-        # confidence chart attack
         fig, ax = plt.subplots(figsize=(10, 4))
         labels = [attack_label_names[i] for i in range(len(attack_proba))]
         sns.barplot(x=labels, y=attack_proba, palette='Reds_r', ax=ax)
