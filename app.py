@@ -22,7 +22,7 @@ st.sidebar.header("Input Network Traffic")
 
 duration = st.sidebar.number_input("Duration", min_value=0, value=0)
 protocol = st.sidebar.selectbox("Protocol Type", [0, 1, 2],
-                                 format_func=lambda x: ['tcp','udp','icmp'][x])
+                                 format_func=lambda x: ['icmp','tcp','udp'][x])
 src_bytes = st.sidebar.number_input("Source Bytes", min_value=0, value=181)
 dst_bytes = st.sidebar.number_input("Destination Bytes", min_value=0, value=5450)
 count = st.sidebar.number_input("Count", min_value=0, value=2)
