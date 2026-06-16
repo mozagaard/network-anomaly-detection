@@ -54,7 +54,10 @@ if st.sidebar.button("🔍 Deteksi Sekarang"):
     binary_proba = xgb_binary.predict_proba(input_df)[0]
 
     st.subheader("Hasil Deteksi")
-
+    
+    st.write("Debug input:", input_dict['protocol_type'], 
+         input_dict['count'], input_dict['src_bytes'])
+    
     if binary_pred == 0:
         st.success(f"✅ Traffic NORMAL (confidence: {binary_proba[0]*100:.1f}%)")
 
