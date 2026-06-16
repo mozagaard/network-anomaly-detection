@@ -62,7 +62,7 @@ if st.sidebar.button("🔍 Deteksi Sekarang"):
     # if confidence di bawah 70%, anggap normal
     # index label normal = 4 (berdasarkan label_to_int)
     if proba[prediction] < 0.70:
-        prediction = 4  # set ke normal
+        prediction = 5  # set ke normal
     
     attack_label = attack_names.get(prediction, f"Unknown ({prediction})")
 
