@@ -5,8 +5,10 @@ import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# load model binary dan feature names
+# load semua model
 xgb_binary = joblib.load('model/xgb_binary.pkl')
+xgb_attack = joblib.load('model/xgb_attack.pkl')
+attack_label_names = joblib.load('model/attack_label_names.pkl')
 feature_names = joblib.load('model/feature_names.pkl')
 
 st.set_page_config(
@@ -16,7 +18,7 @@ st.set_page_config(
 )
 
 st.title("🛡️ Network Anomaly Detection")
-st.markdown("Deteksi serangan jaringan menggunakan Machine Learning (XGBoost Binary)")
+st.markdown("Deteksi serangan jaringan menggunakan Cascading XGBoost Classifier")
 
 st.sidebar.header("Input Network Traffic")
 
@@ -46,33 +48,60 @@ if st.sidebar.button("🔍 Deteksi Sekarang"):
     input_dict['srv_count'] = srv_count
 
     input_df = pd.DataFrame([input_dict])
-    prediction = xgb_binary.predict(input_df)[0]
-    proba = xgb_binary.predict_proba(input_df)[0]
+
+    # stage 1 — binary detection
+    binary_pred = xgb_binary.predict(input_df)[0]
+    binary_proba = xgb_binary.predict_proba(input_df)[0]
 
     st.subheader("Hasil Deteksi")
 
-    if prediction == 0:
-        st.success(f"✅ Traffic NORMAL — Tidak terdeteksi serangan (confidence: {proba[0]*100:.1f}%)")
-    else:
-        st.error(f"🚨 ANOMALI TERDETEKSI! (confidence: {proba[1]*100:.1f}%)")
+    if binary_pred == 0:
+        st.success(f"✅ Traffic NORMAL (confidence: {binary_proba[0]*100:.1f}%)")
 
-    # confidence chart
-    st.subheader("Confidence Score")
-    fig, ax = plt.subplots(figsize=(6, 3))
-    sns.barplot(x=['Normal', 'Anomali'], y=[proba[0], proba[1]], 
-                palette=['green', 'red'], ax=ax)
-    ax.set_ylabel('Probability')
-    ax.set_title('Confidence Model')
-    st.pyplot(fig)
+        # confidence chart
+        fig, ax = plt.subplots(figsize=(6, 3))
+        sns.barplot(x=['Normal', 'Anomali'], 
+                   y=[binary_proba[0], binary_proba[1]],
+                   palette=['green', 'red'], ax=ax)
+        ax.set_ylabel('Probability')
+        ax.set_title('Confidence Score')
+        st.pyplot(fig)
+
+    else:
+        st.error(f"🚨 ANOMALI TERDETEKSI! (confidence: {binary_proba[1]*100:.1f}%)")
+
+        # stage 2 — attack classification
+        attack_pred = xgb_attack.predict(input_df)[0]
+        attack_proba = xgb_attack.predict_proba(input_df)[0]
+        attack_name = attack_label_names.get(attack_pred, "Unknown")
+
+        st.warning(f"⚔️ Tipe Serangan: **{attack_name.upper()}**")
+
+        # confidence chart attack
+        fig, ax = plt.subplots(figsize=(10, 4))
+        labels = [attack_label_names[i] for i in range(len(attack_proba))]
+        sns.barplot(x=labels, y=attack_proba, palette='Reds_r', ax=ax)
+        ax.set_ylabel('Probability')
+        ax.set_title('Confidence per Tipe Serangan')
+        plt.xticks(rotation=45)
+        st.pyplot(fig)
 
 else:
     st.info("👈 Isi parameter di sidebar kiri, lalu klik Deteksi Sekarang!")
 
     st.subheader("Tentang Project Ini")
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Dataset", "KDD Cup 99")
     with col2:
-        st.metric("Model", "XGBoost Binary")
+        st.metric("Stage 1", "Binary XGBoost")
     with col3:
+        st.metric("Stage 2", "Attack Classifier")
+    with col4:
         st.metric("Accuracy", "99%+")
+
+    st.subheader("Cara Kerja Cascading Classifier")
+    st.markdown("""
+    1. **Stage 1** — Model pertama deteksi apakah traffic Normal atau Anomali
+    2. **Stage 2** — Kalau Anomali, model kedua identifikasi tipe serangannya
+    """)
