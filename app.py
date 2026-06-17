@@ -1,15 +1,12 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import joblib
-import matplotlib.pyplot as plt
-import seaborn as sns
+import plotly.express as px
+import plotly.graph_objects as go
 
-# load semua model
-xgb_binary = joblib.load('model/xgb_binary.pkl')
-xgb_attack = joblib.load('model/xgb_attack.pkl')
-attack_label_names = joblib.load('model/attack_label_names.pkl')
-feature_names = joblib.load('model/feature_names.pkl')
+# ======================
+# PAGE CONFIG
+# ======================
 
 st.set_page_config(
     page_title="Network Anomaly Detection",
@@ -17,89 +14,387 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🛡️ Network Anomaly Detection")
-st.markdown("Deteksi serangan jaringan menggunakan Cascading XGBoost Classifier")
+# ======================
+# CUSTOM CSS
+# ======================
 
-st.sidebar.header("Input Network Traffic")
+st.markdown("""
+<style>
 
-duration = st.sidebar.number_input("Duration", min_value=0, value=0)
-protocol = st.sidebar.selectbox("Protocol Type", [0, 1, 2],
-                                 format_func=lambda x: ['icmp','tcp','udp'][x])
-src_bytes = st.sidebar.number_input("Source Bytes", min_value=0, value=181)
-dst_bytes = st.sidebar.number_input("Destination Bytes", min_value=0, value=5450)
-count = st.sidebar.number_input("Count", min_value=0, value=2)
-srv_count = st.sidebar.number_input("Srv Count", min_value=0, value=2)
-same_srv_rate = st.sidebar.slider("Same Srv Rate", 0.0, 1.0, 0.5)
-diff_srv_rate = st.sidebar.slider("Diff Srv Rate", 0.0, 1.0, 0.5)
-wrong_fragment = st.sidebar.number_input("Wrong Fragment", min_value=0, value=0)
-serror_rate = st.sidebar.slider("Serror Rate", 0.0, 1.0, 0.0)
+.main {
+    background-color: #0f172a;
+}
 
-if st.sidebar.button("🔍 Deteksi Sekarang"):
-    input_dict = {col: 0 for col in feature_names}
-    input_dict['duration'] = duration
-    input_dict['protocol_type'] = protocol
-    input_dict['src_bytes'] = src_bytes
-    input_dict['dst_bytes'] = dst_bytes
-    input_dict['wrong_fragment'] = wrong_fragment
-    input_dict['same_srv_rate'] = same_srv_rate
-    input_dict['diff_srv_rate'] = diff_srv_rate
-    input_dict['serror_rate'] = serror_rate
-    input_dict['count'] = count
-    input_dict['srv_count'] = srv_count
+[data-testid="stMetric"]{
+    background: #111827;
+    border: 1px solid #374151;
+    padding: 15px;
+    border-radius: 15px;
+    text-align:center;
+}
+
+.stButton > button {
+    width:100%;
+    background:#2563eb;
+    color:white;
+    border:none;
+    border-radius:10px;
+    height:50px;
+    font-size:18px;
+    font-weight:bold;
+}
+
+.stButton > button:hover{
+    background:#1d4ed8;
+}
+
+.block-container{
+    padding-top:2rem;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# ======================
+# LOAD MODEL
+# ======================
+
+xgb_binary = joblib.load("model/xgb_binary.pkl")
+xgb_attack = joblib.load("model/xgb_attack.pkl")
+
+attack_label_names = joblib.load(
+    "model/attack_label_names.pkl"
+)
+
+feature_names = joblib.load(
+    "model/feature_names.pkl"
+)
+
+# ======================
+# HERO SECTION
+# ======================
+
+st.markdown("""
+<div style="
+padding:25px;
+border-radius:20px;
+background:linear-gradient(135deg,#0f172a,#1e293b);
+color:white;
+margin-bottom:20px;
+">
+
+<h1>🛡️ Network Anomaly Detection System</h1>
+
+<p>
+Real-Time Intrusion Detection using Cascading XGBoost Classifier
+</p>
+
+</div>
+""", unsafe_allow_html=True)
+
+# ======================
+# KPI SECTION
+# ======================
+
+k1, k2, k3, k4 = st.columns(4)
+
+with k1:
+    st.metric("📊 Dataset", "KDD Cup 99")
+
+with k2:
+    st.metric("🤖 Stage 1", "Binary XGBoost")
+
+with k3:
+    st.metric("⚔️ Stage 2", "Attack Classifier")
+
+with k4:
+    st.metric("🎯 Accuracy", "99%+")
+
+st.divider()
+
+# ======================
+# INPUT SECTION
+# ======================
+
+st.subheader("📡 Network Traffic Parameters")
+
+left, right = st.columns(2)
+
+with left:
+    duration = st.number_input(
+        "Duration",
+        min_value=0,
+        value=0
+    )
+
+    src_bytes = st.number_input(
+        "Source Bytes",
+        min_value=0,
+        value=181
+    )
+
+    dst_bytes = st.number_input(
+        "Destination Bytes",
+        min_value=0,
+        value=5450
+    )
+
+    count = st.number_input(
+        "Count",
+        min_value=0,
+        value=2
+    )
+
+    wrong_fragment = st.number_input(
+        "Wrong Fragment",
+        min_value=0,
+        value=0
+    )
+
+with right:
+
+    protocol = st.selectbox(
+        "Protocol Type",
+        [0, 1, 2],
+        format_func=lambda x:
+        ["icmp", "tcp", "udp"][x]
+    )
+
+    srv_count = st.number_input(
+        "Srv Count",
+        min_value=0,
+        value=2
+    )
+
+    same_srv_rate = st.slider(
+        "Same Service Rate",
+        0.0,
+        1.0,
+        0.5
+    )
+
+    diff_srv_rate = st.slider(
+        "Different Service Rate",
+        0.0,
+        1.0,
+        0.5
+    )
+
+    serror_rate = st.slider(
+        "Serror Rate",
+        0.0,
+        1.0,
+        0.0
+    )
+
+analyze = st.button(
+    "🚀 Analyze Traffic"
+)
+
+# ======================
+# PREDICTION
+# ======================
+
+if analyze:
+
+    input_dict = {
+        col: 0 for col in feature_names
+    }
+
+    input_dict["duration"] = duration
+    input_dict["protocol_type"] = protocol
+    input_dict["src_bytes"] = src_bytes
+    input_dict["dst_bytes"] = dst_bytes
+    input_dict["wrong_fragment"] = wrong_fragment
+    input_dict["same_srv_rate"] = same_srv_rate
+    input_dict["diff_srv_rate"] = diff_srv_rate
+    input_dict["serror_rate"] = serror_rate
+    input_dict["count"] = count
+    input_dict["srv_count"] = srv_count
 
     input_df = pd.DataFrame([input_dict])
 
-    # stage 1 — binary detection
-    binary_pred = xgb_binary.predict(input_df)[0]
-    binary_proba = xgb_binary.predict_proba(input_df)[0]
+    binary_pred = xgb_binary.predict(
+        input_df
+    )[0]
 
-    st.subheader("Hasil Deteksi")
+    binary_proba = xgb_binary.predict_proba(
+        input_df
+    )[0]
+
+    st.divider()
+
+    st.subheader("🔎 Detection Result")
+
+    # ======================
+    # NORMAL
+    # ======================
 
     if binary_pred == 0:
-        st.success(f"✅ Traffic NORMAL (confidence: {binary_proba[0]*100:.1f}%)")
 
-        fig, ax = plt.subplots(figsize=(6, 3))
-        sns.barplot(x=['Normal', 'Anomali'],
-                   y=[binary_proba[0], binary_proba[1]],
-                   palette=['green', 'red'], ax=ax)
-        ax.set_ylabel('Probability')
-        ax.set_title('Confidence Score')
-        st.pyplot(fig)
+        st.success(
+            f"✅ NORMAL TRAFFIC | Confidence: {binary_proba[0]*100:.2f}%"
+        )
+
+        fig = px.bar(
+            x=["Normal", "Anomaly"],
+            y=[
+                binary_proba[0],
+                binary_proba[1]
+            ],
+            color=[
+                "Normal",
+                "Anomaly"
+            ],
+            color_discrete_sequence=[
+                "#22c55e",
+                "#ef4444"
+            ]
+        )
+
+        fig.update_layout(
+            title="Prediction Confidence",
+            template="plotly_dark",
+            height=350,
+            showlegend=False
+        )
+
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
+
+    # ======================
+    # ATTACK
+    # ======================
 
     else:
-        st.error(f"🚨 ANOMALI TERDETEKSI! (confidence: {binary_proba[1]*100:.1f}%)")
 
-        # stage 2 — attack classification
-        attack_pred = xgb_attack.predict(input_df)[0]
-        attack_proba = xgb_attack.predict_proba(input_df)[0]
-        attack_name = attack_label_names.get(attack_pred, "Unknown")
+        st.markdown(f"""
+        <div style="
+        background:#7f1d1d;
+        padding:20px;
+        border-radius:15px;
+        color:white;
+        text-align:center;
+        ">
+        <h2>🚨 ATTACK DETECTED</h2>
+        <h3>Confidence: {binary_proba[1]*100:.2f}%</h3>
+        </div>
+        """, unsafe_allow_html=True)
 
-        st.warning(f"⚔️ Tipe Serangan: **{attack_name.upper()}**")
+        attack_pred = xgb_attack.predict(
+            input_df
+        )[0]
 
-        fig, ax = plt.subplots(figsize=(10, 4))
-        labels = [attack_label_names[i] for i in range(len(attack_proba))]
-        sns.barplot(x=labels, y=attack_proba, palette='Reds_r', ax=ax)
-        ax.set_ylabel('Probability')
-        ax.set_title('Confidence per Tipe Serangan')
-        plt.xticks(rotation=45)
-        st.pyplot(fig)
+        attack_proba = xgb_attack.predict_proba(
+            input_df
+        )[0]
+
+        attack_name = attack_label_names.get(
+            attack_pred,
+            "Unknown"
+        )
+
+        st.warning(
+            f"⚔️ Attack Type: {attack_name.upper()}"
+        )
+
+        labels = [
+            attack_label_names[i]
+            for i in range(len(attack_proba))
+        ]
+
+        attack_df = pd.DataFrame({
+            "Attack Type": labels,
+            "Probability": attack_proba
+        })
+
+        fig_attack = px.bar(
+            attack_df,
+            x="Attack Type",
+            y="Probability",
+            color="Probability",
+            color_continuous_scale="Reds"
+        )
+
+        fig_attack.update_layout(
+            template="plotly_dark",
+            height=450,
+            title="Attack Classification Confidence"
+        )
+
+        st.plotly_chart(
+            fig_attack,
+            use_container_width=True
+        )
+
+    # ======================
+    # FEATURE IMPORTANCE
+    # ======================
+
+    st.subheader(
+        "📈 Feature Importance"
+    )
+
+    importance_df = pd.DataFrame({
+        "Feature": feature_names,
+        "Importance":
+        xgb_binary.feature_importances_
+    })
+
+    importance_df = (
+        importance_df
+        .sort_values(
+            "Importance",
+            ascending=False
+        )
+        .head(10)
+    )
+
+    fig_imp = px.bar(
+        importance_df,
+        x="Importance",
+        y="Feature",
+        orientation="h",
+        color="Importance",
+        color_continuous_scale="Blues"
+    )
+
+    fig_imp.update_layout(
+        template="plotly_dark",
+        height=500
+    )
+
+    st.plotly_chart(
+        fig_imp,
+        use_container_width=True
+    )
+
+# ======================
+# INFO SECTION
+# ======================
 
 else:
-    st.info("👈 Isi parameter di sidebar kiri, lalu klik Deteksi Sekarang!")
 
-    st.subheader("Tentang Project Ini")
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Dataset", "KDD Cup 99")
-    with col2:
-        st.metric("Stage 1", "Binary XGBoost")
-    with col3:
-        st.metric("Stage 2", "Attack Classifier")
-    with col4:
-        st.metric("Accuracy", "99%+")
+    st.info(
+        "👆 Configure the traffic parameters and click Analyze Traffic."
+    )
 
-    st.subheader("Cara Kerja Cascading Classifier")
+    st.subheader(
+        "How Cascading Classification Works"
+    )
+
     st.markdown("""
-    1. **Stage 1** — Model pertama deteksi apakah traffic Normal atau Anomali
-    2. **Stage 2** — Kalau Anomali, model kedua identifikasi tipe serangannya
-    """)
+### Stage 1 — Binary Detection
+Determine whether incoming traffic is Normal or Anomalous.
+
+### Stage 2 — Attack Classification
+If an anomaly is detected, the second model identifies the attack category.
+
+### Benefits
+- Faster detection process
+- Reduced false positives
+- Better attack categorization
+- Interpretable machine learning workflow
+""")
